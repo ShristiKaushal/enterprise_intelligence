@@ -1,0 +1,135 @@
+version: "3.9"
+
+services:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: eip_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-eip_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-eip_password}
+      POSTGRES_DB: ${POSTGRES_DB:-enterprise_intelligence}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/seeds:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-eip_user} -d ${POSTGRES_DB:-enterprise_intelligence}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eip_network
+
+  # ── Redis (optional, for production job queue) ────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: eip_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - eip_network
+
+  # ── Backend API ────────────────────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: eip_backend
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-eip_user}:${POSTGRES_PASSWORD:-eip_password}@postgres:5432/${POSTGRES_DB:-enterprise_intelligence}
+      - DATABASE_SYNC_URL=postgresql://${POSTGRES_USER:-eip_user}:${POSTGRES_PASSWORD:-eip_password}@postgres:5432/${POSTGRES_DB:-enterprise_intelligence}
+      - REDIS_URL=redis://redis:6379/0
+      - AI_PROVIDER=${AI_PROVIDER:-mock}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - UPLOAD_DIR=/app/uploads
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - APP_ENV=${APP_ENV:-development}
+      - CORS_ORIGINS=["http://localhost:3000","http://frontend:5173"]
+    ports:
+      - "8000:8000"
+    volumes:
+      - uploads_data:/app/uploads
+      - ./backend:/app:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - eip_network
+
+  # ── Background Worker ─────────────────────────────────────────────────────
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: eip_worker
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-eip_user}:${POSTGRES_PASSWORD:-eip_password}@postgres:5432/${POSTGRES_DB:-enterprise_intelligence}
+      - DATABASE_SYNC_URL=postgresql://${POSTGRES_USER:-eip_user}:${POSTGRES_PASSWORD:-eip_password}@postgres:5432/${POSTGRES_DB:-enterprise_intelligence}
+      - REDIS_URL=redis://redis:6379/0
+      - AI_PROVIDER=${AI_PROVIDER:-mock}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - UPLOAD_DIR=/app/uploads
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    volumes:
+      - uploads_data:/app/uploads
+      - ./backend:/app:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - eip_network
+
+  # ── Frontend ───────────────────────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: eip_frontend
+    restart: unless-stopped
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_APP_NAME=Enterprise Intelligence Platform
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - eip_network
+
+volumes:
+  postgres_data:
+  uploads_data:
+
+networks:
+  eip_network:
+    driver: bridge
