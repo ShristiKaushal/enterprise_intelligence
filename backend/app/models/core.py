@@ -308,7 +308,9 @@ class EntityResolutionLog(Base, UUIDMixin, TimestampMixin):
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     is_new_entity: Mapped[bool] = mapped_column(Boolean, default=False)
     requires_review: Mapped[bool] = mapped_column(Boolean, default=False)
-    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     document_id: Mapped[Optional[uuid.UUID]] = mapped_column(
         UUID(as_uuid=True), ForeignKey("raw_documents.id"), nullable=True
@@ -351,7 +353,9 @@ class ProvenanceLink(Base, UUIDMixin, TimestampMixin):
 class AuditLog(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "audit_log"
 
-    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     user_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     action: Mapped[str] = mapped_column(String(200), nullable=False)
     resource_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
@@ -391,7 +395,9 @@ class ReviewQueueItem(Base, UUIDMixin, TimestampMixin):
     # pending | approved | rejected | edited | ignored
     priority: Mapped[str] = mapped_column(String(20), default="medium", nullable=False)
 
-    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     resolution_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

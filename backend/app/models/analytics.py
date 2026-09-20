@@ -81,10 +81,16 @@ class SentimentTrend(Base, UUIDMixin, TimestampMixin):
     period_end: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     period_type: Mapped[str] = mapped_column(String(20), nullable=False)  # daily | weekly | monthly
 
-    # Dimensions (nullable = aggregate)
-    customer_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
-    service_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
-    product_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    # Dimensions (nullable = aggregate rows with no specific entity)
+    customer_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dim_customer.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    service_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dim_service.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    product_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("dim_product.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     category: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
 
     # Counts
@@ -166,7 +172,9 @@ class BusinessInsight(Base, UUIDMixin, TimestampMixin):
     # Status
     status: Mapped[str] = mapped_column(String(50), default="active", nullable=False)
     # active | acknowledged | resolved | dismissed
-    acknowledged_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    acknowledged_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     acknowledged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Generation metadata

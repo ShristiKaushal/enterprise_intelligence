@@ -167,7 +167,9 @@ class ExtractedEntity(Base, UUIDMixin, TimestampMixin):
     # Review
     review_status: Mapped[str] = mapped_column(String(50), default="auto_accepted", nullable=False)
     # auto_accepted | pending_review | approved | rejected | edited
-    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
+    reviewed_by_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
     reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     reviewer_note: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 

@@ -2,7 +2,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Database, Upload, Cpu, Users, AlertTriangle,
   BarChart3, Lightbulb, Activity, Shield, Search, GitBranch,
-  Settings, LogOut, Brain, ChevronRight, Bell,
+  Settings, LogOut, Brain, ChevronRight, Bell, BarChart2,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useQuery } from '@tanstack/react-query'
@@ -21,6 +21,7 @@ const NAV = [
   { to: '/customers', icon: Users, label: 'Customers' },
   { to: '/incidents', icon: AlertTriangle, label: 'Incidents' },
   { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+  { to: '/tableau', icon: BarChart2, label: 'Tableau BI' },
   { label: 'GOVERNANCE', isSection: true },
   { to: '/data-quality', icon: Shield, label: 'Data Quality' },
   { to: '/review', icon: GitBranch, label: 'Review Queue' },

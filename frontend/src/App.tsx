@@ -18,6 +18,7 @@ import DataQualityPage from '@/pages/DataQualityPage'
 import QueryPage from '@/pages/QueryPage'
 import ReviewPage from '@/pages/ReviewPage'
 import SettingsPage from '@/pages/SettingsPage'
+import TableauPage from '@/pages/TableauPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -74,6 +75,7 @@ export default function App() {
             <Route path="data-quality" element={<DataQualityPage />} />
             <Route path="query" element={<QueryPage />} />
             <Route path="review" element={<ReviewPage />} />
+            <Route path="tableau" element={<TableauPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
         </Routes>
