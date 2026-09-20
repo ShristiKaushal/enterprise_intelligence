@@ -73,7 +73,7 @@ export default function DashboardPage() {
 
   const { data: insightsRes } = useQuery({
     queryKey: ['insights', 'critical'],
-    queryFn: () => insightsApi.list({ page: 1, page_size: 5, status: 'active' }).then(r => r.data),
+    queryFn: () => insightsApi.list({ page: 1, status: 'active' }).then(r => r.data),
   })
 
   const p = (s: string) => ({ padding: s })

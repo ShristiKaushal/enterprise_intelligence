@@ -79,14 +79,19 @@ export default function Layout() {
                 {item.label}
               </div>
             ) : (
-              <NavLink
-                key={item.to}
-                to={item.to!}
-                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
-              >
-                <item.icon size={15} />
-                {item.label}
-              </NavLink>
+              (() => {
+                const Icon = item.icon as React.ElementType
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={item.to!}
+                    className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
+                  >
+                    <Icon size={15} />
+                    {item.label}
+                  </NavLink>
+                )
+              })()
             )
           )}
         </nav>
