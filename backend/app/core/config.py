@@ -36,6 +36,9 @@ class Settings(BaseSettings):
     # ── Database ─────────────────────────────────────────────────────────────
     DATABASE_URL: str = "postgresql+asyncpg://eip_user:eip_password@localhost:5432/enterprise_intelligence"
     DATABASE_SYNC_URL: str = "postgresql://eip_user:eip_password@localhost:5432/enterprise_intelligence"
+
+    # ── Server ───────────────────────────────────────────────────────────────
+    PORT: int = 8000  # Railway injects $PORT automatically
     DATABASE_POOL_SIZE: int = 10
     DATABASE_MAX_OVERFLOW: int = 20
 
@@ -52,6 +55,9 @@ class Settings(BaseSettings):
     API_HOST: str = "0.0.0.0"
     API_PORT: int = 8000
     API_URL: str = "http://localhost:8000"
+    # Set FRONTEND_URL in Railway env vars to your Vercel URL, e.g.:
+    # https://enterprise-intelligence.vercel.app
+    FRONTEND_URL: Optional[str] = None
     CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
@@ -62,6 +68,13 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5174",
         "http://127.0.0.1:5175",
     ]
+
+    @model_validator(mode="after")
+    def add_frontend_to_cors(self) -> "Settings":
+        """Automatically add FRONTEND_URL to CORS_ORIGINS if set."""
+        if self.FRONTEND_URL and self.FRONTEND_URL not in self.CORS_ORIGINS:
+            self.CORS_ORIGINS = list(self.CORS_ORIGINS) + [self.FRONTEND_URL]
+        return self
 
     # ── File Upload ──────────────────────────────────────────────────────────
     UPLOAD_DIR: str = "./uploads"
