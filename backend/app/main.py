@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import APIRouter, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -59,14 +61,73 @@ app = FastAPI(
 )
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.CORS_ORIGINS,
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$|^https://.*\.vercel\.app$",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+import re as _re
+
+_CORS_ALLOW_REGEX = _re.compile(
+    r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"
+    r"|^https://[\w-]+\.vercel\.app$"
+    r"|^https://[\w-]+\.railway\.app$"
 )
+
+
+class PermissiveCORSMiddleware(BaseHTTPMiddleware):
+    """CORS middleware that injects Access-Control headers on EVERY response,
+    including 4xx/5xx, so browser errors don't masquerade as CORS failures."""
+
+    async def dispatch(self, request: Request, call_next):
+        origin = request.headers.get("origin", "")
+        allowed = (
+            origin in settings.CORS_ORIGINS
+            or bool(_CORS_ALLOW_REGEX.match(origin))
+        )
+
+        # Preflight
+        if request.method == "OPTIONS" and allowed:
+            return JSONResponse(
+                status_code=200,
+                headers={
+                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Credentials": "true",
+                    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Max-Age": "600",
+                },
+            )
+
+        try:
+            response = await call_next(request)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Unhandled exception in request", error=str(exc))
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": "Internal server error"},
+            )
+
+        if allowed:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Access-Control-Allow-Credentials"] = "true"
+            response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+            response.headers["Access-Control-Allow-Headers"] = "*"
+        return response
+
+
+app.add_middleware(PermissiveCORSMiddleware)
+
+
+# ── Global 500 handler (adds CORS headers) ────────────────────────────────────
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    origin = request.headers.get("origin", "")
+    headers = {}
+    if origin in settings.CORS_ORIGINS or bool(_CORS_ALLOW_REGEX.match(origin)):
+        headers["Access-Control-Allow-Origin"] = origin
+        headers["Access-Control-Allow-Credentials"] = "true"
+    logger.error("Unhandled exception", error=str(exc), path=request.url.path)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+        headers=headers,
+    )
 
 
 # ── Request ID middleware ─────────────────────────────────────────────────────
