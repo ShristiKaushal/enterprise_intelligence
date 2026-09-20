@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     # https://enterprise-intelligence.vercel.app
     FRONTEND_URL: Optional[str] = None
     CORS_ORIGINS: List[str] = [
+        "https://enterprise-intelligence-beige.vercel.app",
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5174",
@@ -93,6 +94,24 @@ class Settings(BaseSettings):
     # ── Logging ──────────────────────────────────────────────────────────────
     LOG_LEVEL: str = "INFO"
     LOG_FORMAT: str = "json"
+
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def validate_database_url(cls, v: Any) -> str:
+        if isinstance(v, str):
+            if v.startswith("postgres://"):
+                v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif v.startswith("postgresql://") and not v.startswith("postgresql+"):
+                v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return v
+
+    @field_validator("DATABASE_SYNC_URL", mode="before")
+    @classmethod
+    def validate_sync_url(cls, v: Any) -> str:
+        if isinstance(v, str):
+            if v.startswith("postgresql+asyncpg://"):
+                v = v.replace("postgresql+asyncpg://", "postgresql://", 1)
+        return v
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
