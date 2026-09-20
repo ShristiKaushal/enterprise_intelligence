@@ -7,7 +7,7 @@ import time
 import uuid
 from contextlib import asynccontextmanager
 
-from fastapi import APIRouter, FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -87,15 +87,17 @@ class PermissiveCORSMiddleware(BaseHTTPMiddleware):
         )
 
         # Preflight
-        if request.method == "OPTIONS" and allowed:
-            return JSONResponse(
-                status_code=200,
+        if request.method == "OPTIONS":
+            req_headers = request.headers.get("access-control-request-headers", "*")
+            allow_origin = origin if allowed else (origin or "*")
+            return Response(
+                status_code=204,
                 headers={
-                    "Access-Control-Allow-Origin": origin,
+                    "Access-Control-Allow-Origin": allow_origin,
                     "Access-Control-Allow-Credentials": "true",
-                    "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-                    "Access-Control-Allow-Headers": "*",
-                    "Access-Control-Max-Age": "600",
+                    "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+                    "Access-Control-Allow-Headers": req_headers or "*",
+                    "Access-Control-Max-Age": "86400",
                 },
             )
 
@@ -112,7 +114,7 @@ class PermissiveCORSMiddleware(BaseHTTPMiddleware):
         if allowed:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
-            response.headers["Access-Control-Allow-Methods"] = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+            response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, PATCH, DELETE, OPTIONS"
             response.headers["Access-Control-Allow-Headers"] = "*"
         return response
 
