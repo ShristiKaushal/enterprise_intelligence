@@ -83,3 +83,36 @@ async def create_all_tables() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     logger.info("All tables created via create_all_tables()")
+
+
+async def init_db_tables_and_users() -> None:
+    """Ensure all tables exist and seed demo users if database is empty."""
+    await create_all_tables()
+
+    from app.models.user import User
+    from app.core.security import hash_password
+    from sqlalchemy import select
+
+    demo_users = [
+        {"email": "admin@eip.local", "username": "admin", "full_name": "Platform Admin", "password": "Admin@12345", "role": "admin"},
+        {"email": "analyst@eip.local", "username": "analyst", "full_name": "Data Analyst", "password": "Analyst@12345", "role": "analyst"},
+        {"email": "viewer@eip.local", "username": "viewer", "full_name": "Dashboard Viewer", "password": "Viewer@12345", "role": "viewer"},
+    ]
+
+    async with AsyncSessionLocal() as session:
+        for u in demo_users:
+            result = await session.execute(select(User).where(User.email == u["email"]))
+            if not result.scalar_one_or_none():
+                new_user = User(
+                    email=u["email"],
+                    username=u["username"],
+                    full_name=u["full_name"],
+                    hashed_password=hash_password(u["password"]),
+                    role=u["role"],
+                    is_active=True,
+                    is_verified=True,
+                )
+                session.add(new_user)
+                logger.info("Auto-seeded demo user", email=u["email"], role=u["role"])
+        await session.commit()
+    logger.info("Database tables and demo users verified/initialized")

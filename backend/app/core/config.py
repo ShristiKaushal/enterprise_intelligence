@@ -6,7 +6,7 @@ from __future__ import annotations
 import secrets
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     # Set FRONTEND_URL in Railway env vars to your Vercel URL, e.g.:
     # https://enterprise-intelligence.vercel.app
     FRONTEND_URL: Optional[str] = None
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "https://enterprise-intelligence-beige.vercel.app",
         "http://localhost:3000",
         "http://localhost:5173",
@@ -73,14 +73,15 @@ class Settings(BaseSettings):
     @model_validator(mode="after")
     def add_frontend_to_cors(self) -> "Settings":
         """Automatically add FRONTEND_URL to CORS_ORIGINS if set."""
-        if self.FRONTEND_URL and self.FRONTEND_URL not in self.CORS_ORIGINS:
-            self.CORS_ORIGINS = list(self.CORS_ORIGINS) + [self.FRONTEND_URL]
+        if isinstance(self.CORS_ORIGINS, list):
+            if self.FRONTEND_URL and self.FRONTEND_URL not in self.CORS_ORIGINS:
+                self.CORS_ORIGINS = list(self.CORS_ORIGINS) + [self.FRONTEND_URL]
         return self
 
     # ── File Upload ──────────────────────────────────────────────────────────
     UPLOAD_DIR: str = "./uploads"
     MAX_FILE_SIZE_MB: int = 100
-    ALLOWED_EXTENSIONS: List[str] = ["pdf", "docx", "txt", "csv", "xlsx", "xls", "json"]
+    ALLOWED_EXTENSIONS: Union[List[str], str] = ["pdf", "docx", "txt", "csv", "xlsx", "xls", "json"]
 
     # ── Background Jobs ──────────────────────────────────────────────────────
     JOB_BACKEND: str = "memory"  # memory | redis
@@ -99,10 +100,20 @@ class Settings(BaseSettings):
     @classmethod
     def validate_database_url(cls, v: Any) -> str:
         if isinstance(v, str):
+            import re
+            v = v.strip().strip("'\"").rstrip(".")
             if v.startswith("postgres://"):
                 v = v.replace("postgres://", "postgresql+asyncpg://", 1)
             elif v.startswith("postgresql://") and not v.startswith("postgresql+"):
                 v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+            # asyncpg doesn't accept channel_binding
+            v = re.sub(r"[?&]channel_binding=[^&]+", "", v)
+            # asyncpg uses ssl= rather than sslmode=
+            v = re.sub(r"sslmode=require", "ssl=require", v)
+            v = re.sub(r"sslmode=prefer", "ssl=prefer", v)
+            v = re.sub(r"sslmode=disable", "ssl=disable", v)
+            if "?" not in v and "&" in v:
+                v = v.replace("&", "?", 1)
         return v
 
     @field_validator("DATABASE_SYNC_URL", mode="before")

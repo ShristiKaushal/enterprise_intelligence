@@ -37,6 +37,11 @@ async def lifespan(app: FastAPI):
         logger.warning("Database not reachable at startup — some features may be unavailable")
     else:
         logger.info("Database connection verified")
+        try:
+            from app.database.session import init_db_tables_and_users
+            await init_db_tables_and_users()
+        except Exception as e:
+            logger.error("Failed to auto-create tables on startup", error=str(e))
 
     from app.tasks.queue import task_queue
     await task_queue.start()
@@ -98,9 +103,10 @@ class PermissiveCORSMiddleware(BaseHTTPMiddleware):
             response = await call_next(request)
         except Exception as exc:  # noqa: BLE001
             logger.error("Unhandled exception in request", error=str(exc))
+            detail = str(exc) if (settings.APP_DEBUG or settings.APP_ENV != "production") else "Internal server error"
             response = JSONResponse(
                 status_code=500,
-                content={"detail": "Internal server error"},
+                content={"detail": detail},
             )
 
         if allowed:
@@ -123,9 +129,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         headers["Access-Control-Allow-Origin"] = origin
         headers["Access-Control-Allow-Credentials"] = "true"
     logger.error("Unhandled exception", error=str(exc), path=request.url.path)
+    detail = str(exc) if (settings.APP_DEBUG or settings.APP_ENV != "production") else "Internal server error"
     return JSONResponse(
         status_code=500,
-        content={"detail": "Internal server error"},
+        content={"detail": detail},
         headers=headers,
     )
 
@@ -159,12 +166,14 @@ async def add_request_id(request: Request, call_next):
 @app.get("/health", tags=["System"])
 async def health_check():
     db_ok = await check_db_connection()
+    db_target = settings.DATABASE_URL.split("@")[-1] if "@" in settings.DATABASE_URL else "not_configured"
     return {
         "status": "healthy" if db_ok else "degraded",
         "version": settings.APP_VERSION,
         "env": settings.APP_ENV,
         "ai_provider": settings.AI_PROVIDER,
         "database": "connected" if db_ok else "unreachable",
+        "database_target": db_target,
     }
 
 

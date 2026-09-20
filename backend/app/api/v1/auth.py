@@ -94,10 +94,17 @@ async def login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: AsyncSession = Depends(get_db),
 ):
-    result = await db.execute(
-        select(User).where(User.email == form_data.username, User.is_active == True)
-    )
-    user = result.scalar_one_or_none()
+    try:
+        result = await db.execute(
+            select(User).where(User.email == form_data.username, User.is_active == True)
+        )
+        user = result.scalar_one_or_none()
+    except Exception as e:
+        logger.error("Database query failed during login", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection error. Please verify DATABASE_URL is properly configured.",
+        )
 
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
