@@ -152,7 +152,24 @@ export default function Layout() {
                 <span>{overview.open_incidents ?? 0} open incidents</span>
               </div>
             )}
-            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} title="Connected" />
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '3px 9px',
+                borderRadius: 6,
+                background: 'rgba(16,185,129,0.1)',
+                border: '1px solid rgba(16,185,129,0.25)',
+                fontSize: 11,
+                color: '#10b981',
+                fontWeight: 600,
+              }}
+              title="Platform Connected"
+            >
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10b981', boxShadow: '0 0 6px #10b981' }} />
+              Active
+            </div>
           </div>
         </header>
 

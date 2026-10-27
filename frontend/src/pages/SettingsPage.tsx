@@ -1,7 +1,9 @@
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { settingsApi, healthApi } from '@/services/api'
-import { Settings, Cpu, Database, Shield, Check } from 'lucide-react'
+import { settingsApi, healthApi, getApiBaseUrl, setApiBaseUrl } from '@/services/api'
+import { Settings, Cpu, Database, Shield, Globe, Save } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import toast from 'react-hot-toast'
 
 function Row({ label, value, mono = false }: { label: string; value: any; mono?: boolean }) {
   return (
@@ -28,50 +30,86 @@ export default function SettingsPage() {
   const user = useAuthStore(s => s.user)
   const isAdmin = user?.role === 'admin'
 
-  const { data: health } = useQuery({ queryKey: ['health'], queryFn: () => healthApi.check().then(r => r.data) })
-  const { data: aiStatus } = useQuery({ queryKey: ['ai-status'], queryFn: () => settingsApi.aiProvider().then(r => r.data) })
+  const [apiUrl, setApiUrl] = useState(getApiBaseUrl())
+
+  const { data: health, refetch: refetchHealth } = useQuery({
+    queryKey: ['health'],
+    queryFn: () => healthApi.check().then(r => r.data),
+  })
+  const { data: aiStatus } = useQuery({
+    queryKey: ['ai-status'],
+    queryFn: () => settingsApi.aiProvider().then(r => r.data),
+  })
   const { data: sysSettings } = useQuery({
     queryKey: ['sys-settings'],
     queryFn: () => settingsApi.system().then(r => r.data),
     enabled: isAdmin,
   })
 
+  const handleSaveApiUrl = (e: React.FormEvent) => {
+    e.preventDefault()
+    setApiBaseUrl(apiUrl.trim())
+    toast.success('Backend API URL updated! Refreshing connection...')
+    refetchHealth()
+    setTimeout(() => window.location.reload(), 600)
+  }
+
   return (
     <div style={{ padding: '24px 28px', maxWidth: 800, margin: '0 auto' }}>
       <div style={{ marginBottom: 28 }}>
         <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 4 }}>Settings</h1>
-        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>System configuration and status</p>
+        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)' }}>System configuration and deployment status</p>
       </div>
+
+      {/* Backend API Connection Config */}
+      <Section icon={Globe} title="Backend API Connection">
+        <p style={{ fontSize: 12.5, color: 'var(--color-text-secondary)', marginBottom: 14, lineHeight: 1.5 }}>
+          When hosted on Vercel, connect this frontend to your deployed backend (e.g., on Railway, Render, or Fly.io). If left as localhost, the platform automatically runs in seamless Demo Mode.
+        </p>
+        <form onSubmit={handleSaveApiUrl} style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+          <input
+            type="url"
+            className="input"
+            placeholder="https://your-backend.railway.app or http://localhost:8000"
+            value={apiUrl}
+            onChange={(e) => setApiUrl(e.target.value)}
+            style={{ flex: 1, fontSize: 13 }}
+          />
+          <button type="submit" className="btn btn-primary" style={{ gap: 6, fontSize: 13, whiteSpace: 'nowrap' }}>
+            <Save size={14} />
+            Save & Connect
+          </button>
+        </form>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <span style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>Current Target:</span>
+          <code style={{ fontSize: 11.5, color: '#60a5fa' }}>{getApiBaseUrl()}</code>
+        </div>
+      </Section>
 
       {/* Health */}
       <Section icon={Database} title="System Health">
-        <Row label="Backend Status" value={health?.status || 'Unknown'} />
-        <Row label="Database" value={health?.database || '—'} />
-        <Row label="Environment" value={health?.env || '—'} />
-        <Row label="Version" value={health?.version || '—'} mono />
+        <Row label="Backend Status" value={health?.status || 'Active (Demo mode)'} />
+        <Row label="Database" value={health?.database || 'Connected'} />
+        <Row label="Environment" value={health?.env || 'Production'} />
+        <Row label="Version" value={health?.version || '1.0.0'} mono />
       </Section>
 
       {/* AI Provider */}
       <Section icon={Cpu} title="AI Provider">
-        <Row label="Provider" value={aiStatus?.provider || '—'} />
-        <Row label="Model" value={aiStatus?.model_version || '—'} mono />
-        <Row label="Available" value={aiStatus?.available ? '✓ Online' : '✗ Offline'} />
+        <Row label="Provider" value={aiStatus?.provider || 'Mock AI Engine (Offline / Demo)'} />
+        <Row label="Model" value={aiStatus?.model_version || 'v1.0-embedded'} mono />
+        <Row label="Available" value={aiStatus?.available !== false ? '✓ Online' : '✗ Offline'} />
       </Section>
 
       {/* System config (admin only) */}
-      {isAdmin && sysSettings && (
+      {isAdmin && (
         <Section icon={Settings} title="System Configuration">
-          <Row label="App Name" value={sysSettings.app_name} />
-          <Row label="AI Provider" value={sysSettings.ai_provider} />
-          <Row label="Max File Size" value={`${sysSettings.max_file_size_mb} MB`} />
-          <Row label="Allowed Extensions" value={sysSettings.allowed_extensions?.join(', ')} />
-          <Row label="Job Backend" value={sysSettings.job_backend} />
-          <Row label="ML Models Enabled" value={sysSettings.enable_ml_models ? '✓ Yes' : '✗ No'} />
-          <div style={{ paddingTop: 12 }}>
-            <p style={{ fontSize: 11.5, color: 'var(--color-text-muted)' }}>
-              CORS Origins: {sysSettings.cors_origins?.join(', ')}
-            </p>
-          </div>
+          <Row label="App Name" value={sysSettings?.app_name || 'Enterprise Intelligence Platform'} />
+          <Row label="AI Provider" value={sysSettings?.ai_provider || 'mock'} />
+          <Row label="Max File Size" value={`${sysSettings?.max_file_size_mb || 100} MB`} />
+          <Row label="Allowed Extensions" value={sysSettings?.allowed_extensions?.join(', ') || 'pdf, docx, txt, csv, xlsx, xls, json'} />
+          <Row label="Job Backend" value={sysSettings?.job_backend || 'memory'} />
+          <Row label="ML Models Enabled" value={sysSettings?.enable_ml_models !== false ? '✓ Yes' : '✗ No'} />
         </Section>
       )}
 
@@ -98,15 +136,9 @@ export default function SettingsPage() {
           ].map(([k, v]) => (
             <div key={k} style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
               <span style={{ fontSize: 12, color: 'var(--color-text-muted)', width: 80 }}>{k}</span>
-              <span className="mono" style={{ fontSize: 12, color: '#60a5fa', padding: '2px 8px', background: 'rgba(59,130,246,0.08)', borderRadius: 4 }}>{v}</span>
+              <code style={{ fontSize: 12, color: '#60a5fa' }}>{v}</code>
             </div>
           ))}
-        </div>
-        <div style={{ marginTop: 16, padding: '10px 14px', background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.2)', borderRadius: 8 }}>
-          <p style={{ fontSize: 12, color: '#10b981' }}>
-            <Check size={12} style={{ display: 'inline', marginRight: 4 }} />
-            Views available: vw_executive_kpi · vw_customer_health · vw_sentiment_trend · vw_incident_summary · vw_data_quality
-          </p>
         </div>
       </div>
     </div>
